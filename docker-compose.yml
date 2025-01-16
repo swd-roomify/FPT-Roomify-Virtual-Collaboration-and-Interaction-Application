@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ./roomify-fe
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_REACT_APP_WS_URL=http://pog.threemusketeer.click:8081/ws
+    networks:
+      - media-network
+
+  backend-media:
+    build:
+      context: ./roomify-media-be
+      dockerfile: Dockerfile
+    container_name: backend-media
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    networks:
+      - media-network
+    volumes:
+      - backend-data:/app/data
+    depends_on:
+      postgresql:
+        condition: service_healthy
+
+  sfu-client:
+    build:
+      context: ./roomify-sfu-client
+      dockerfile: Dockerfile
+    container_name: sfu-client
+    restart: always
+    ports:
+      - "5174:5174"
+    environment:
+      - VITE_SFU_SERVER_URL=http://pog.threemusketeer.click:8082
+    networks:
+      - media-network
+
+  sfu-server:
+    build:
+      context: ./roomify-sfu-server
+      dockerfile: Dockerfile
+    container_name: sfu-server
+    restart: always
+    ports:
+      - "8082:8082"
+    networks:
+      - media-network
+
+  postgresql:
+    image: postgres
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    container_name: roomify-postgresql-media-db
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+    networks:
+      - media-network
+
+networks:
+  media-network:
+    driver: bridge
+
+volumes:
+  backend-data:
+    external: true
+  postgresql-data:
+    external: true
